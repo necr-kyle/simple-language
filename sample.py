@@ -13,6 +13,11 @@ class Sentence:
         self.length = 0
         self.reach_the_end = False
 
+    def padding(self, length):
+        if length > self.length:
+            self.symbols += [0] * (length - self.length)
+            self.length = length
+
     def get_candidates(self):
         candidates = [i for i in range(1, 10)]
         if self.length == 0:
@@ -63,7 +68,7 @@ class Sentence:
         #                    Even Numbers shouldn't appear 4 times in a row.
         count = 1
         check_id = self.length
-        for des in range(2):
+        for reduction in range(2):
             check_id -= 1
             if check_id > -1 and self.symbols[check_id] % 2 == 1:
                 count += 1
@@ -76,7 +81,7 @@ class Sentence:
                         pass
         count = 1
         check_id = self.length
-        for des in range(3):
+        for reduction in range(3):
             check_id -= 1
             if check_id > -1 and self.symbols[check_id] % 2 == 0:
                 count += 1
@@ -172,7 +177,7 @@ class Sentence:
         if new_symbol % 2 == 1:
             check_id = self.length
             count = 1
-            for des in range(2):
+            for reduction in range(2):
                 check_id -= 1
                 if check_id > -1 and self.symbols[check_id] % 2 == 1:
                     count += 1
@@ -182,7 +187,7 @@ class Sentence:
             if self.length > 2:
                 check_id = self.length
                 count = 1
-                for des in range(3):
+                for reduction in range(3):
                     check_id -= 1
                     if check_id > -1 and self.symbols[check_id] % 2 == 0:
                         count += 1
@@ -255,13 +260,14 @@ def sampling_direct(num_sample: int, sentence_length: int, filename: str):
                     process_failure = False
                 if process_failure:
                     no_more_extend_count += 1
-                    new_sentence.append(0)
+                    new_sentence.padding(sentence_length)
+                    break
             if new_sentence.length == sentence_length:
                 file.write(str(new_sentence)+'\n')
                 count += 1
             else:
                 no_more_extend_count += 0.113
-            if count % 500 < 1:
+            if count % 50 < 1:
                 print(f"write {count} examples with {no_more_extend_count} no_more_extend generations.")
 
 
@@ -269,4 +275,4 @@ if __name__ == '__main__':
     import numpy as np
 
     SENTENCE_LENGTH = 64
-    sampling_direct(3000, SENTENCE_LENGTH, 'train.txt')
+    sampling_direct(300, SENTENCE_LENGTH, 'train.txt')
