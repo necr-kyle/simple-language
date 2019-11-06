@@ -1,6 +1,8 @@
-# Pytorch简单练习：使用Pytorch写一个自创语言的Transformer Encoder
+# A Simple "Language" to play with 
 
-自创语言的设计如下：
+A simple language to play with using models like Transformers.
+
+A quick way to check whether a Transformer will function or not.
 
 - Symbols: Integers from 1 to 9 (both side included), Integer 0 as the end of a sequence.
 - Syntax:
@@ -14,7 +16,4 @@
   And:
     1. Continuous appearance of the same number is allowed.
     2. The length of a sentence has no bounds (or reasonably, a lower bound of 1).
-    3. There are chances that a given sequence cannot be extended any more (especially for longer sequences),
-      and there should be a zero appended to its end.
-
-使用程序获得长度固定的随机样本若干，作为训练数据进行输入。
+    3. There are chances that a given sequence cannot be extended any more (especially for longer sequences), and there should be a zero appended to its end.
