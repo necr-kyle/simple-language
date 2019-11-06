@@ -1,4 +1,5 @@
 from typing import List, Dict, Tuple
+import time
 class Sentence:
     def __init__(self,
                  allow_random_end=False):
@@ -53,7 +54,7 @@ class Sentence:
         sum_ = self.symbols[self.length - 2] + self.symbols[self.length - 1]
         i = 0
         while i < len(candidates):
-            if candidates[i] + sum_ < 6 or candidates[i] + sum_ > 23:
+            if candidates[i] + sum_ < 6 or candidates[i] + sum_ > 22:
                 candidates.remove(candidates[i])
             else:
                 i += 1
@@ -77,7 +78,7 @@ class Sentence:
         check_id = self.length
         for des in range(3):
             check_id -= 1
-            if check_id > -1 and self.symbols[check_id] % 2 == 1:
+            if check_id > -1 and self.symbols[check_id] % 2 == 0:
                 count += 1
         if count >= 4:    
             for i in range(1, 10):
@@ -209,7 +210,8 @@ class Sentence:
         return ret_str
 
 
-def sampling(num_sample: int, sentence_length: int, filename: str):
+def sampling_trial(num_sample: int, sentence_length: int, filename: str):
+    # Abandoned: takes x2.6 time compared to sampling_direct
     seq = np.arange(1, 10)
     with open(filename, 'w+') as file:
         count = 0
@@ -237,12 +239,34 @@ def sampling(num_sample: int, sentence_length: int, filename: str):
             if count % 50 < 1:
                 print(f"write {count} examples with {no_more_extend_count} no_more_extend generations.")
 
+def sampling_direct(num_sample: int, sentence_length: int, filename: str):
+    seq = np.arange(1, 10)
+    with open(filename, 'w+') as file:
+        count = 0
+        no_more_extend_count = 0
+        while count < num_sample:
+            new_sentence = Sentence()
+            for j in range(sentence_length):
+                process_failure = True
+                seq = new_sentence.get_candidates()
+                if len(seq) != 0:
+                    np.random.shuffle(seq)
+                    new_sentence._no_restrict_append(seq[0])
+                    process_failure = False
+                if process_failure:
+                    no_more_extend_count += 1
+                    new_sentence.append(0)
+            if new_sentence.length == sentence_length:
+                file.write(str(new_sentence)+'\n')
+                count += 1
+            else:
+                no_more_extend_count += 0.113
+            if count % 500 < 1:
+                print(f"write {count} examples with {no_more_extend_count} no_more_extend generations.")
+
 
 if __name__ == '__main__':
     import numpy as np
 
     SENTENCE_LENGTH = 64
-
-    sampling(300, SENTENCE_LENGTH, 'train.txt')
-    sampling(100, SENTENCE_LENGTH, 'test.txt')
-
+    sampling_direct(3000, SENTENCE_LENGTH, 'train.txt')
