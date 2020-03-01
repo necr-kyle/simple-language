@@ -1,15 +1,22 @@
 from typing import List, Dict, Tuple
 import time
+import numpy as np
+
+SENTENCE_LENGTH = 64
+SAMPLE_NUM = 300
+
 class Sentence:
     def __init__(self,
                  allow_random_end=False):
-        # if not allow random end, the sentence end iff appending any token is invalid.
+        # If allow_random_end is true, the sentence may end at any position 
+        # even if the sequence can proceed further.
+        # If not, the sentence end if and only if appending any token is an invalid move.
         self.clear()
         self.allow_random_end = allow_random_end
 
     def clear(self):
         self.symbols = []
-        self.next_valid_symbol = list(range(10)).remove(0)
+        self.next_valid_symbol = list(range(1, 10))
         self.length = 0
         self.reach_the_end = False
 
@@ -18,24 +25,35 @@ class Sentence:
             self.symbols += [0] * (length - self.length)
             self.length = length
 
+
+    def get_random_end(self, candidates):
+        probabilities = [1 for i in range(len(candidates))]
+        if self.allow_random_end:
+            probabilities.append(0.2)
+            candidates.append(10)
+        if len(candidates) == 0:
+            self.reach_the_end = True
+            candidates.append(10)
+            probabilities.append(1)
+        probabilities = np.array(probabilities) / np.sum(probabilities)
+        return candidates, probabilities
+        
+
     def get_candidates(self):
         candidates = [i for i in range(1, 10)]
+        if self.reach_the_end:
+            return [], []
         if self.length == 0:
             # Check syntax No.6
             try:
                 candidates.remove(2)
             except ValueError:
                 pass
-            return candidates
+            return self.get_random_end(candidates)
 
         # Check syntax No.5
         if self.length % 7 == 6:
-            for i in range(1, 10):
-                if i % 3 != 0:
-                    try:
-                        candidates.remove(i)
-                    except ValueError:
-                        pass
+            candidates = [num for num in candidates if num % 3 == 0]
             
 
         # Check syntax No.2
@@ -73,12 +91,8 @@ class Sentence:
             if check_id > -1 and self.symbols[check_id] % 2 == 1:
                 count += 1
         if count >= 3:    
-            for i in range(1, 10):
-                if i % 2 == 1:
-                    try:
-                        candidates.remove(i)
-                    except ValueError:
-                        pass
+            candidates = [num for num in candidates if num % 2 == 0]
+
         count = 1
         check_id = self.length
         for reduction in range(3):
@@ -86,12 +100,7 @@ class Sentence:
             if check_id > -1 and self.symbols[check_id] % 2 == 0:
                 count += 1
         if count >= 4:    
-            for i in range(1, 10):
-                if i % 2 == 0:
-                    try:
-                        candidates.remove(i)
-                    except ValueError:
-                        pass
+            candidates = [num for num in candidates if num % 2 == 1]
                     
         # Check syntax No.7: If there are eight consecutive numbers that are not 9,
         #                    the next number must be 9.
@@ -102,15 +111,9 @@ class Sentence:
                     break
                 count += 1
             if count == 8:
-                for i in range(1, 9):
-                    try:
-                        candidates.remove(i)
-                    except ValueError:
-                        pass
+                candidates = [num for num in candidates if num == 9]
         
-        if self.allow_random_end:
-            candidates.append(0)
-        return candidates
+        return self.get_random_end(candidates)
 
     def _no_restrict_append(self, new_symbol):
         self.symbols.append(new_symbol)
@@ -139,14 +142,13 @@ class Sentence:
         ''' Return: if the appending succeeds, otherwise an error message. '''
         # if type(new_symbol) is not int:
         #     raise TypeError("Type of <new_symbol> should be int.")
-        if new_symbol < 0 or new_symbol > 9:
-            raise ValueError("0 <= new_symbol < 10 should be satisfied.")
-        if new_symbol == 0:
+        if new_symbol < 1 or new_symbol > 10:
+            raise ValueError("0 < new_symbol <= 10 should be satisfied.")
+        if new_symbol == 10:
             self.reach_the_end = True
             return True, "Passed."
         if self.reach_the_end:
             return False, "Reached the end."
-
 
         if self.length == 0:
             # Check syntax No.6
@@ -208,41 +210,12 @@ class Sentence:
 
     def __str__(self):
         ret_str = ''
-        for i in range(self.length):
-            ret_str += str(self.symbols[i])
-            if i != self.length - 1:
+        for idx in range(self.length):
+            ret_str += str(self.symbols[idx])
+            if idx != self.length - 1:
                 ret_str += ','   
         return ret_str
 
-
-def sampling_trial(num_sample: int, sentence_length: int, filename: str):
-    # Abandoned: takes x2.6 time compared to sampling_direct
-    seq = np.arange(1, 10)
-    with open(filename, 'w+') as file:
-        count = 0
-        no_more_extend_count = 0
-        while count < num_sample:
-            new_sentence = Sentence()
-            for j in range(sentence_length):
-                process_failure = True
-                np.random.shuffle(seq)
-                for k in seq:
-                    valid, inst = new_sentence.append(k)
-                    if valid:
-                        process_failure = False
-                        break
-                if process_failure:
-                    no_more_extend_count += 1
-                    if no_more_extend_count <= 3:
-                        print(f"failure example:{new_sentence},\nreason:{inst}")
-                    new_sentence.append(0)
-            if new_sentence.length == sentence_length:
-                file.write(str(new_sentence)+'\n')
-                count += 1
-            else:
-                no_more_extend_count += 0.113
-            if count % 50 < 1:
-                print(f"write {count} examples with {no_more_extend_count} no_more_extend generations.")
 
 def sampling_direct(num_sample: int, sentence_length: int, filename: str):
     seq = np.arange(1, 10)
@@ -250,15 +223,13 @@ def sampling_direct(num_sample: int, sentence_length: int, filename: str):
         count = 0
         no_more_extend_count = 0
         while count < num_sample:
+            # An empty sentence where allow_random_end is False
             new_sentence = Sentence()
             for j in range(sentence_length):
-                process_failure = True
-                seq = new_sentence.get_candidates()
+                seq, prob = new_sentence.get_candidates()
                 if len(seq) != 0:
-                    np.random.shuffle(seq)
-                    new_sentence._no_restrict_append(seq[0])
-                    process_failure = False
-                if process_failure:
+                    new_sentence._no_restrict_append(np.random.choice(seq, p=prob))
+                else:
                     no_more_extend_count += 1
                     new_sentence.padding(sentence_length)
                     break
@@ -272,7 +243,7 @@ def sampling_direct(num_sample: int, sentence_length: int, filename: str):
 
 
 if __name__ == '__main__':
-    import numpy as np
-
-    SENTENCE_LENGTH = 64
-    sampling_direct(300, SENTENCE_LENGTH, 'train.txt')
+    start = time.time()
+    sampling_direct(SAMPLE_NUM, SENTENCE_LENGTH, 'test.txt')
+    end = time.time()
+    print(end-start, 'seconds.')
